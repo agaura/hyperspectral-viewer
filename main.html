@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyperspectral Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="app">
+    <section class="sidebar">
+      <div>
+        <h1>Hyperspectral Viewer</h1>
+        <p class="description">Explore wavelength-dependent structure. Hover over and/or click the spectral strip or image to inspect other bands or spectra of pixels.</p>
+      </div>
+      <div class="chart-wrapper">
+        <svg id="spectrum-chart" role="img" aria-label="Reflectance spectrum"></svg>
+      </div>
+      <div class="inspector">
+        <div class="inspector-row">
+          <span class="label">Wavelength</span>
+          <span class="value" id="info-wavelength">—</span>
+        </div>
+        <div class="inspector-row">
+          <span class="label">Pixel</span>
+          <span class="value" id="info-position">—</span>
+        </div>
+        <div class="inspector-row">
+          <span class="label">TOA Radiance</span>
+          <span class="value" id="info-reflectance">—</span>
+        </div>
+      </div>
+      <div class="sidebar-note">
+        <p>This image shows the visible portion of a hyperspectral image from Planet's Tanager Open Data, showing Berkeley, California on May 14th, 2025.</p>
+        <p>Hover over the image to preview reflectance spectra. Click to set a reference wavelength or pixel.</p>
+        <p>Use the visible light spectrum strip to scrub through the image at different wavelengths.</p>
+      </div>
+    </section>
+    <section class="viewport" id="viewport">
+      <div class="band-controls">
+        <div class="band-control" data-role="band-min-control">
+          <div class="control-row">
+            <label for="band-min-slider">Min Radiance</label>
+            <span class="band-value" id="band-min-value">0.00</span>
+          </div>
+          <input type="range" id="band-min-slider" min="0" max="1" step="0.001" value="0" />
+        </div>
+        <div class="band-control" data-role="band-max-control">
+          <div class="control-row">
+            <label for="band-max-slider">Max Radiance</label>
+            <span class="band-value" id="band-max-value">1.00</span>
+          </div>
+          <input type="range" id="band-max-slider" min="0" max="1" step="0.001" value="1" />
+        </div>
+        <label class="band-toggle" for="band-auto-toggle">
+          <input type="checkbox" id="band-auto-toggle" checked />
+          <span>Auto range</span>
+        </label>
+      </div>
+      <div class="canvas-wrapper" id="image-wrapper">
+        <canvas id="image-canvas" aria-label="Hyperspectral band canvas"></canvas>
+        <div class="selection-indicator" id="selection-indicator"></div>
+        <div class="loading" id="loading">Loading hyperspectral data…</div>
+      </div>
+      <div class="strip-wrapper" id="strip-wrapper">
+        <canvas id="strip-canvas" aria-label="Spectral strip"></canvas>
+        <div class="strip-axis" id="strip-axis"></div>
+      </div>
+    </section>
+    <footer class="site-footer">
+      <small>
+        Tanager STAC Data, available at
+        <a href="https://www.planet.com/data/stac" target="_blank" rel="noopener noreferrer">www.planet.com/data/stac</a>
+        © 2025 Planet Labs PBC. All Rights Reserved.
+      </small>
+    </footer>
+  </main>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
