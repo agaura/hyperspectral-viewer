@@ -128,6 +128,12 @@ section.sidebar p.description {
   display: block;
 }
 
+.chart-wrapper.is-pending,
+.strip-axis.is-pending,
+.inspector.is-pending {
+  visibility: hidden;
+}
+
 .inspector {
   display: grid;
   gap: 0.8rem;
@@ -309,12 +315,18 @@ section.viewport {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 18px 35px rgba(6, 10, 18, 0.55);
   overflow: hidden;
   background: rgba(4, 6, 11, 0.9);
+  touch-action: none;
 }
 
 .canvas-wrapper canvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+#image-canvas,
+#strip-canvas {
+  touch-action: none;
 }
 
 #image-canvas {

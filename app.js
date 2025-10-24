@@ -11,6 +11,20 @@ const stripAxisContainer = document.getElementById('strip-axis');
 const chartWrapper = document.querySelector('.chart-wrapper');
 const chartSvgElement = document.getElementById('spectrum-chart');
 const loadingOverlay = document.getElementById('loading');
+const inspectorPanel = document.querySelector('.inspector');
+const sidebarElement = document.querySelector('.sidebar');
+const sidebarNote = sidebarElement ? sidebarElement.querySelector('.sidebar-note') : null;
+const viewportSection = document.getElementById('viewport');
+
+if (chartWrapper) {
+  chartWrapper.classList.add('is-pending');
+}
+if (stripAxisContainer) {
+  stripAxisContainer.classList.add('is-pending');
+}
+if (inspectorPanel) {
+  inspectorPanel.classList.add('is-pending');
+}
 
 const bandMinSlider = document.getElementById('band-min-slider');
 const bandMaxSlider = document.getElementById('band-max-slider');
@@ -22,6 +36,10 @@ const selectionIndicator = document.getElementById('selection-indicator');
 const infoWavelength = document.getElementById('info-wavelength');
 const infoPosition = document.getElementById('info-position');
 const infoReflectance = document.getElementById('info-reflectance');
+
+const pointerListenerOptions = { passive: false };
+const smallScreenQuery = window.matchMedia('(max-width: 880px)');
+let chartInspectorRelocated = false;
 
 // --- renderer setup ---
 const mainContext = imageCanvas.getContext('webgl2', { antialias: true, alpha: true }) || undefined;
@@ -291,6 +309,8 @@ const state = {
   hoverSpectrum: null,
   globalMax: 0,
   globalYAxisMax: 10,
+  isStripPointerActive: false,
+  isImagePointerActive: false,
 };
 
 if (bandMinSlider && bandMaxSlider) {
@@ -356,6 +376,15 @@ async function init() {
     state.initialized = true;
     updateMainPlaneScale();
     handleResize();
+    if (chartWrapper) {
+      chartWrapper.classList.remove('is-pending');
+    }
+    if (stripAxisContainer) {
+      stripAxisContainer.classList.remove('is-pending');
+    }
+    if (inspectorPanel) {
+      inspectorPanel.classList.remove('is-pending');
+    }
 
     await setDisplayBand(state.activeBandIndex);
     await ensureSpectrumForPixel(state.activePixel, { force: true, target: 'selected' });
@@ -441,13 +470,17 @@ async function loadCieTexture(url) {
 }
 
 // --- interactions ---
-stripCanvas.addEventListener('pointermove', handleStripPointerMove);
+stripCanvas.addEventListener('pointermove', handleStripPointerMove, pointerListenerOptions);
 stripCanvas.addEventListener('pointerleave', handleStripPointerLeave);
-stripCanvas.addEventListener('pointerdown', handleStripPointerDown);
+stripCanvas.addEventListener('pointerdown', handleStripPointerDown, pointerListenerOptions);
+stripCanvas.addEventListener('pointerup', handleStripPointerUp);
+stripCanvas.addEventListener('pointercancel', handleStripPointerCancel);
 
-imageCanvas.addEventListener('pointermove', handleImagePointerMove);
+imageCanvas.addEventListener('pointermove', handleImagePointerMove, pointerListenerOptions);
 imageCanvas.addEventListener('pointerleave', handleImagePointerLeave);
-imageCanvas.addEventListener('pointerdown', handleImagePointerDown);
+imageCanvas.addEventListener('pointerdown', handleImagePointerDown, pointerListenerOptions);
+imageCanvas.addEventListener('pointerup', handleImagePointerUp);
+imageCanvas.addEventListener('pointercancel', handleImagePointerCancel);
 
 const resizeObserver = new ResizeObserver(handleResize);
 [imageWrapper, stripWrapper, chartWrapper].forEach((el) => {
@@ -457,13 +490,23 @@ const resizeObserver = new ResizeObserver(handleResize);
 });
 window.addEventListener('resize', handleResize);
 
+if (typeof smallScreenQuery.addEventListener === 'function') {
+  smallScreenQuery.addEventListener('change', applyResponsiveLayout);
+} else {
+  smallScreenQuery.addListener(applyResponsiveLayout);
+}
+applyResponsiveLayout();
+
 function handleStripPointerMove(event) {
   if (!state.initialized || !state.cie) {
-    return;
+    return null;
+  }
+  if (event && event.pointerType === 'touch') {
+    event.preventDefault();
   }
   const rect = stripCanvas.getBoundingClientRect();
   if (!rect.width) {
-    return;
+    return null;
   }
   const ratio = (event.clientX - rect.left) / rect.width;
   const clamped = clamp01(ratio);
@@ -473,9 +516,14 @@ function handleStripPointerMove(event) {
   const target = minWl + clamped * (maxWl - minWl);
   const bandIndex = nearestBand(target, state.wavelengths);
   state.hoverBandIndex = bandIndex;
+  if (state.isStripPointerActive && Number.isInteger(bandIndex)) {
+    state.activeBandIndex = bandIndex;
+    updateInfoPanel();
+  }
   setDisplayBand(bandIndex).catch((error) => {
     console.error('Unable to update band on hover', error);
   });
+  return bandIndex;
 }
 
 function handleStripPointerLeave() {
@@ -483,22 +531,57 @@ function handleStripPointerLeave() {
     return;
   }
   state.hoverBandIndex = null;
+  state.isStripPointerActive = false;
   setDisplayBand(state.activeBandIndex).catch((error) => {
     console.error('Unable to restore band after hover', error);
   });
 }
 
-function handleStripPointerDown() {
+function handleStripPointerDown(event) {
   if (!state.initialized) {
     return;
   }
-  state.activeBandIndex = state.displayBandIndex;
+  let bandIndex = null;
+  if (event && event.pointerType === 'touch') {
+    capturePointer(stripCanvas, event);
+    state.isStripPointerActive = true;
+    event.preventDefault();
+    bandIndex = handleStripPointerMove(event);
+  } else if (event) {
+    bandIndex = handleStripPointerMove(event);
+  }
+  if (Number.isInteger(bandIndex)) {
+    state.activeBandIndex = bandIndex;
+  } else {
+    state.activeBandIndex = state.displayBandIndex;
+  }
   updateInfoPanel();
+}
+
+function handleStripPointerUp(event) {
+  if (!state.initialized) {
+    return;
+  }
+  if (event && event.pointerType === 'touch') {
+    if (!state.isStripPointerActive) {
+      return;
+    }
+    releasePointerCaptureSafe(stripCanvas, event);
+    state.isStripPointerActive = false;
+    handleStripPointerLeave();
+  }
+}
+
+function handleStripPointerCancel(event) {
+  handleStripPointerUp(event);
 }
 
 function handleImagePointerMove(event) {
   if (!state.initialized) {
     return;
+  }
+  if (event && event.pointerType === 'touch') {
+    event.preventDefault();
   }
   const pixel = eventToPixel(event);
   if (!pixel) {
@@ -506,6 +589,10 @@ function handleImagePointerMove(event) {
   }
   state.hoverPixel = pixel;
   state.displayPixel = pixel;
+  if (state.isImagePointerActive) {
+    state.activePixel = pixel;
+    updateSelectionIndicator();
+  }
   updateInfoPanel();
   ensureSpectrumForPixel(pixel, { target: 'hover' }).catch((error) => {
     console.error('Unable to update hover spectrum', error);
@@ -516,6 +603,7 @@ function handleImagePointerLeave() {
   if (!state.initialized) {
     return;
   }
+  state.isImagePointerActive = false;
   state.hoverPixel = null;
   state.displayPixel = state.activePixel;
   updateInfoPanel();
@@ -530,6 +618,12 @@ function handleImagePointerDown(event) {
   if (!state.initialized) {
     return;
   }
+  if (event && event.pointerType === 'touch') {
+    capturePointer(imageCanvas, event);
+    state.isImagePointerActive = true;
+    event.preventDefault();
+    handleImagePointerMove(event);
+  }
   const pixel = eventToPixel(event);
   if (!pixel) {
     return;
@@ -541,6 +635,24 @@ function handleImagePointerDown(event) {
     console.error('Unable to update spectrum after click', error);
   });
   updateSelectionIndicator();
+}
+
+function handleImagePointerUp(event) {
+  if (!state.initialized) {
+    return;
+  }
+  if (event && event.pointerType === 'touch') {
+    if (!state.isImagePointerActive) {
+      return;
+    }
+    releasePointerCaptureSafe(imageCanvas, event);
+    state.isImagePointerActive = false;
+    handleImagePointerLeave();
+  }
+}
+
+function handleImagePointerCancel(event) {
+  handleImagePointerUp(event);
 }
 
 // --- rendering helpers ---
@@ -1026,6 +1138,30 @@ function computeYAxisCeil(value) {
   return rounded;
 }
 
+function capturePointer(element, event) {
+  if (!element || typeof element.setPointerCapture !== 'function') {
+    return;
+  }
+  try {
+    element.setPointerCapture(event.pointerId);
+  } catch (error) {
+    // Ignore failures to capture; browser may not support it for this pointer type.
+  }
+}
+
+function releasePointerCaptureSafe(element, event) {
+  if (!element || typeof element.releasePointerCapture !== 'function') {
+    return;
+  }
+  try {
+    if (typeof element.hasPointerCapture !== 'function' || element.hasPointerCapture(event.pointerId)) {
+      element.releasePointerCapture(event.pointerId);
+    }
+  } catch (error) {
+    // Ignore failures to release; pointer may already be released.
+  }
+}
+
 function nearestBand(target, wavelengths) {
   let index = 0;
   let best = Infinity;
@@ -1037,6 +1173,30 @@ function nearestBand(target, wavelengths) {
     }
   }
   return index;
+}
+
+function applyResponsiveLayout() {
+  if (!chartWrapper || !inspectorPanel || !viewportSection) {
+    return;
+  }
+  const shouldRelocate = smallScreenQuery.matches;
+  if (shouldRelocate && !chartInspectorRelocated) {
+    viewportSection.insertAdjacentElement('afterend', chartWrapper);
+    chartWrapper.insertAdjacentElement('afterend', inspectorPanel);
+    chartInspectorRelocated = true;
+  } else if (!shouldRelocate && chartInspectorRelocated) {
+    if (sidebarElement) {
+      const note = sidebarElement.querySelector('.sidebar-note') || sidebarNote;
+      if (note) {
+        sidebarElement.insertBefore(inspectorPanel, note);
+        sidebarElement.insertBefore(chartWrapper, inspectorPanel);
+      } else {
+        sidebarElement.appendChild(chartWrapper);
+        sidebarElement.appendChild(inspectorPanel);
+      }
+    }
+    chartInspectorRelocated = false;
+  }
 }
 
 function defaultBandIndex(wavelengths) {
