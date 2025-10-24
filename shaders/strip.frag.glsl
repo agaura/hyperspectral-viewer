@@ -4,9 +4,8 @@ varying vec2 vUv;
 uniform sampler2D uTexture;
 uniform float uScale;
 
-const float DIMMING_FACTOR = 2.1230881684358494;
-const float ALPHA = 0.7715569276056665;
-const float GRAY = 0.8015956245904453;
+const float ALPHA = 0.38130632325908215;
+const float GRAY = 0.3340893499109253;
 
 mat3 xyz_to_p3() {
   return mat3(
@@ -30,8 +29,7 @@ vec3 srgb_transfer_function(vec3 a) {
 
 void main() {
   vec3 xyzSpectral = texture2D(uTexture, vec2(vUv.x, 0.5)).rgb * uScale;
-  vec3 xyzDimmed = xyzSpectral / DIMMING_FACTOR;
-  vec3 p3LinearIdeal = xyz_to_p3() * xyzDimmed;
+  vec3 p3LinearIdeal = xyz_to_p3() * xyzSpectral;
 
   vec3 p3LinearGray = vec3(GRAY) * (1.0 - ALPHA);
   vec3 p3LinearProjected = p3LinearGray + ALPHA * p3LinearIdeal;
