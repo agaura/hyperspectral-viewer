@@ -119,9 +119,7 @@ export class HyperspectralViewer {
       updateGlobalMaxFromArray(this.state.fullRaster, this.state);
 
       stripMaterial.uniforms.uTexture.value = cieInfo.texture;
-      stripMaterial.uniforms.uScale.value = cieInfo.scale;
       mainMaterial.uniforms.uSpectralTexture.value = cieInfo.texture;
-      mainMaterial.uniforms.uSpectralScale.value = cieInfo.scale;
       rendererStrip.render(sceneStrip, cameraStrip);
 
       this.state.activeBandIndex = defaultBandIndex(wavelengths);

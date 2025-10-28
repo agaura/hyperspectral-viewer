@@ -3,7 +3,6 @@ varying vec2 vUv;
 
 uniform sampler2D uTexture;
 uniform sampler2D uSpectralTexture;
-uniform float uSpectralScale;
 uniform float uSpectralCoord;
 uniform float uMinValue;
 uniform float uMaxValue;
@@ -37,7 +36,7 @@ vec3 srgb_transfer_function(vec3 a) {
 }
 
 vec3 spectralBandColor() {
-  vec3 xyzSpectral = texture2D(uSpectralTexture, vec2(uSpectralCoord, 0.5)).rgb * uSpectralScale;
+  vec3 xyzSpectral = texture2D(uSpectralTexture, vec2(uSpectralCoord, 0.5)).rgb;
   return xyz_to_p3() * xyzSpectral;
 }
 

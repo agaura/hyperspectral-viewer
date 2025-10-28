@@ -44,13 +44,11 @@ export async function loadCieTexture(url, isWebGL2) {
 
   const width = rows.length;
   const array = new Float32Array(width * 3);
-  let maxValue = 0;
   rows.forEach((row, index) => {
     const offset = index * 3;
     array[offset + 0] = row.X;
     array[offset + 1] = row.Y;
     array[offset + 2] = row.Z;
-    maxValue = Math.max(maxValue, row.X, row.Y, row.Z);
   });
 
   const texture = new THREE.DataTexture(array, width, 1, THREE.RGBFormat, THREE.FloatType);
@@ -68,6 +66,5 @@ export async function loadCieTexture(url, isWebGL2) {
   return {
     texture,
     wavelengths: rows.map((row) => row.wavelength),
-    scale: maxValue > 0 ? 1 / maxValue : 1,
   };
 }

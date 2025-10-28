@@ -2,7 +2,6 @@ precision highp float;
 varying vec2 vUv;
 
 uniform sampler2D uTexture;
-uniform float uScale;
 
 const float ALPHA = 0.38130632325908215;
 const float GRAY = 0.3340893499109253;
@@ -28,7 +27,7 @@ vec3 srgb_transfer_function(vec3 a) {
 }
 
 void main() {
-  vec3 xyzSpectral = texture2D(uTexture, vec2(vUv.x, 0.5)).rgb * uScale;
+  vec3 xyzSpectral = texture2D(uTexture, vec2(vUv.x, 0.5)).rgb;
   vec3 p3LinearIdeal = xyz_to_p3() * xyzSpectral;
 
   vec3 p3LinearGray = vec3(GRAY) * (1.0 - ALPHA);
