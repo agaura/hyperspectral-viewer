@@ -16,16 +16,26 @@ export function normaliseTypedArray(array) {
   return Float32Array.from(array);
 }
 
-export function updateGlobalMaxFromArray(array, state) {
+export function updateGlobalExtentsFromArray(array, state) {
   if (!array || !array.length) {
     return;
   }
+  let min = Infinity;
   let max = -Infinity;
   for (let i = 0; i < array.length; i += 1) {
     const value = array[i];
-    if (Number.isFinite(value) && value > max) {
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    if (value < min) {
+      min = value;
+    }
+    if (value > max) {
       max = value;
     }
+  }
+  if (Number.isFinite(min)) {
+    state.globalMin = min;
   }
   if (!Number.isFinite(max)) {
     return;
@@ -41,6 +51,15 @@ export function updateGlobalMaxCandidate(value, state) {
   if (!Number.isFinite(state.globalMax) || value > state.globalMax) {
     state.globalMax = value;
     state.globalYAxisMax = computeYAxisCeil(value);
+  }
+}
+
+export function updateGlobalMinCandidate(value, state) {
+  if (!Number.isFinite(value)) {
+    return;
+  }
+  if (!Number.isFinite(state.globalMin) || value < state.globalMin) {
+    state.globalMin = value;
   }
 }
 

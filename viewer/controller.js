@@ -9,8 +9,9 @@ import {
   clamp,
   clamp01,
   normaliseTypedArray,
-  updateGlobalMaxFromArray,
+  updateGlobalExtentsFromArray,
   updateGlobalMaxCandidate,
+  updateGlobalMinCandidate,
   nearestBand,
   formatRadianceLabel,
   formatPixelInfo,
@@ -116,7 +117,7 @@ export class HyperspectralViewer {
 
       const fullRaster = await this.state.image.readRasters({ interleave: true });
       this.state.fullRaster = normaliseTypedArray(fullRaster);
-      updateGlobalMaxFromArray(this.state.fullRaster, this.state);
+      updateGlobalExtentsFromArray(this.state.fullRaster, this.state);
 
       stripMaterial.uniforms.uTexture.value = cieInfo.texture;
       mainMaterial.uniforms.uSpectralTexture.value = cieInfo.texture;
@@ -249,6 +250,7 @@ export class HyperspectralViewer {
 
     const entry = { texture, data: typed, min, max };
     this.state.bandCache.set(index, entry);
+    updateGlobalMinCandidate(min, this.state);
     updateGlobalMaxCandidate(max, this.state);
     return entry;
   }
@@ -337,41 +339,55 @@ export class HyperspectralViewer {
 
   configureBandSliders(entry) {
     const { bandMinSlider, bandMaxSlider } = this.elements;
-    const sliderMin = Number.isFinite(entry.min) ? entry.min : 0;
-    const sliderMax = Number.isFinite(entry.max) ? entry.max : sliderMin + 1;
-    const span = sliderMax - sliderMin;
+    let sliderMin = Number.isFinite(this.state.globalMin) ? this.state.globalMin : Number(entry?.min);
+    if (!Number.isFinite(sliderMin)) {
+      sliderMin = Number.isFinite(entry?.min) ? entry.min : 0;
+    }
+    let sliderMax = Number.isFinite(this.state.globalMax) ? this.state.globalMax : Number(entry?.max);
+    if (!Number.isFinite(sliderMax)) {
+      sliderMax = Number.isFinite(entry?.max) ? entry.max : sliderMin + 1;
+    }
+    if (!Number.isFinite(sliderMax) || sliderMax <= sliderMin) {
+      const epsilon = Math.max(Math.abs(sliderMin) * 1e-3, 1e-3);
+      sliderMax = sliderMin + epsilon;
+    }
     const step = computeSliderStep(sliderMin, sliderMax);
 
     if (bandMinSlider) {
       bandMinSlider.min = sliderMin.toString();
       bandMinSlider.max = sliderMax.toString();
-      bandMinSlider.step = step;
+      bandMinSlider.step = step.toString();
     }
     if (bandMaxSlider) {
       bandMaxSlider.min = sliderMin.toString();
       bandMaxSlider.max = sliderMax.toString();
-      bandMaxSlider.step = step;
+      bandMaxSlider.step = step.toString();
+    }
+
+    const bandMin = Number.isFinite(entry?.min) ? clamp(entry.min, sliderMin, sliderMax) : sliderMin;
+    let bandMax = Number.isFinite(entry?.max) ? clamp(entry.max, sliderMin, sliderMax) : sliderMax;
+    if (bandMax <= bandMin) {
+      const epsilon = Math.max(step, Math.abs(bandMin) * 1e-6, 1e-6);
+      bandMax = clamp(bandMin + epsilon, bandMin, sliderMax);
     }
 
     if (this.state.autoRange) {
-      this.state.displayMin = clamp(Number(entry.min), sliderMin, sliderMax);
-      this.state.displayMax = clamp(Number(entry.max), sliderMin, sliderMax);
-      if (this.state.displayMin > this.state.displayMax) {
-        this.state.displayMin = sliderMin;
-      }
+      this.state.displayMin = bandMin;
+      this.state.displayMax = bandMax;
     } else {
       this.state.displayMin = clamp(this.state.displayMin, sliderMin, sliderMax);
       this.state.displayMax = clamp(this.state.displayMax, sliderMin, sliderMax);
       if (this.state.displayMin >= this.state.displayMax) {
-        this.state.displayMax = Math.min(sliderMax, this.state.displayMin + step);
+        const epsilon = Math.max(step, Math.abs(this.state.displayMin) * 1e-6, 1e-6);
+        this.state.displayMax = Math.min(sliderMax, this.state.displayMin + epsilon);
       }
     }
 
     if (bandMinSlider) {
-      bandMinSlider.value = this.state.displayMin;
+      bandMinSlider.value = this.state.displayMin.toString();
     }
     if (bandMaxSlider) {
-      bandMaxSlider.value = this.state.displayMax;
+      bandMaxSlider.value = this.state.displayMax.toString();
     }
     this.updateBandSliderLabels();
   }
